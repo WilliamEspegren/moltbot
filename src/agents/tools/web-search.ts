@@ -432,18 +432,20 @@ async function runSeltzSearch(params: {
   const data = (await res.json()) as SeltzSearchResponse;
   const documents = data.documents ?? [];
 
-  return documents.map((doc) => {
-    const url = doc.url ?? "";
-    const content = doc.content ?? "";
-    const siteName = resolveSiteName(url);
-    const truncatedContent = content.length > 200 ? content.slice(0, 200) + "..." : content;
-    return {
-      title: siteName || url,
-      url,
-      description: truncatedContent,
-      siteName,
-    };
-  });
+  return documents
+    .filter((doc) => doc.url)
+    .map((doc) => {
+      const url = doc.url!;
+      const content = doc.content ?? "";
+      const siteName = resolveSiteName(url);
+      const truncatedContent = content.length > 200 ? content.slice(0, 200) + "..." : content;
+      return {
+        title: siteName || url,
+        url,
+        description: truncatedContent,
+        siteName,
+      };
+    });
 }
 
 async function runWebSearch(params: {
@@ -460,10 +462,13 @@ async function runWebSearch(params: {
   perplexityBaseUrl?: string;
   perplexityModel?: string;
 }): Promise<Record<string, unknown>> {
+  const baseParts = `${params.provider}:${params.query}:${params.count}:${params.country || "default"}:${params.search_lang || "default"}:${params.ui_lang || "default"}`;
   const cacheKey = normalizeCacheKey(
     params.provider === "brave"
-      ? `${params.provider}:${params.query}:${params.count}:${params.country || "default"}:${params.search_lang || "default"}:${params.ui_lang || "default"}:${params.freshness || "default"}`
-      : `${params.provider}:${params.query}:${params.count}:${params.country || "default"}:${params.search_lang || "default"}:${params.ui_lang || "default"}`,
+      ? `${baseParts}:${params.freshness || "default"}`
+      : params.provider === "perplexity"
+        ? `${baseParts}:${params.perplexityModel || "default"}:${params.perplexityBaseUrl || "default"}`
+        : baseParts,
   );
   const cached = readCache(SEARCH_CACHE, cacheKey);
   if (cached) {
